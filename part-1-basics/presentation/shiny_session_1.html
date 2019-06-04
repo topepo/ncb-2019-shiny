@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>Part 1: The Basics</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Max Kuhn (RStudio)" />
+    <link rel="stylesheet" href="mtheme_max.css" type="text/css" />
+    <link rel="stylesheet" href="fonts_mtheme_max.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Part 1: The Basics
+### Max Kuhn (RStudio)
+
+---
+
+
+
+## What Is `shiny`?
+
+`shiny` is [a web application framework for R](shiny.rstudio.com)
+
+You can create a web application where you define the user interface (UI) look and feel and create R code to work behind the scenes to generate output
+
+There are two main software components to `shiny`:
+
+ * the `shiny` [R package](https://cran.r-project.org/package=shiny) that is installed into R
+ * a `shiny` server that runs the web application.
+ 
+To develop and test applications, only the R package is required.  
+
+---
+
+# Illustrations
+
+John Chambers invented the S language "to turn ideas into software, quickly and faithfully".
+
+`shiny` attempts to do the same thing with R and visualization. 
+
+Here are some instances that meld statistics and visualizations:
+
+ * [Visual Algorithms for the Traveling Salesman Problem](https://gallery.shinyapps.io/shiny-salesman/)
+ * [Airline Performance Comparison](http://nycdatascience.com/airline-performance-comparison-with-rshiny/)
+ * [Playing with Google Analytics Data](https://mcpasin.shinyapps.io/PlayingGoogleAnalyticsDataViz)
+ * [Crime Data Visualisation](https://blenditbayes.shinyapps.io/crimemap/)
+ * [Process Mass Intensity (PMI) for Chemical Synthesis route](https://acsgcipr-predictpmi.shinyapps.io/pmi_calculator/)
+
+---
+
+# Advantages 
+
+ * all the software is free ("as in beer" and "as is speech"")
+ * you can install it anywhere without worrying about licenses
+ * it is well-supported (officially and unofficially) and well-developed
+ * it integrates with modern web features (e.g. HTML, Javascript, Google Widgets, css, JSON, markdown, etc)
+ * reliable
+ * cross-platform
+ * it knows how to handle types of R objects (e.g. plots vs tables vs text etc.)
+ * great integration with RStudio 
+ * rich user-interface capabilities 
+ * dozens of `shiny` related packages on CRAN and Bioconductor, thousands of [related github repositories](http://bit.ly/1PyOUwg)
+
+---
+
+# Disadvantages
+
+ * somewhat fluid due to being early in its lifespan
+ * need to know `R`
+ * requires a web server to let other people use the applications
+ * typically does not enable _large_ scale interactive data analysis 
+ * was not created for a "launch the job and come back" approach (although you can do this)
+
+---
+
+# Resources to Learn More
+
+ * [Teach yourself `shiny`](http://shiny.rstudio.com/tutorial/)
+ * the [`shiny` cheatsheet](http://shiny.rstudio.com/articles/cheatsheet.html)
+ * [Gallery/examples](http://shiny.rstudio.com/gallery/)
+ * Stackoverflow [`shiny` questions](http://stackoverflow.com/questions/tagged/?tagnames=shiny&amp;sort=newest)
+ * [`shiny` on CRAN](https://cran.r-project.org/package=shiny)
+ * `shiny` articles on [R-Bloggers](http://www.r-bloggers.com/search/shiny)
+ * [github repository](https://github.com/rstudio/shiny)
+ * [other shiny github projects](http://bit.ly/1PyOUwg)
+
+---
+
+# Today 
+
+Our goal for this workshop is:
+
+ * focus on `shiny` applications (not the server)
+ * get everyone comfortable with server and user interface code
+ * show examples of inputs and outputs
+ * demonstrate reactivity
+ * illustrate how to test and develop your application
+
+
+---
+
+# Basic Structure of an Application
+
+A shiny application is usually contained in a specific directory. 
+
+The typical structure of an application directory is to have at least two files:
+
+```
+Application/Directory
+|-- server.R
+`-- ui.R
+```
+
+Th ui file controls how the application looks and its structure. 
+
+The server file defines the calculations and outputs.
+
+The directory can have other files, such as `RData` files with results or data. 
+
+---
+
+# Application 1: Show a plot in the browser
+
+We have a set of example applications in the workshop materials:
+
+&lt;pre&gt;
+|-- simple_app
+|   |-- ui.R
+|   `-- server.R
+|-- sidebar_app
+|   |-- ui.R
+|   `-- server.R
+`-- roundtrip
+    |-- ui.R
+    |-- server.R
+    `-- safety_data.csv
+&lt;/pre&gt;
+
+Our first application is `simple_app`.
+
+---
+
+# The `ui.R` File
+
+The UI file contains a function call `shinyUI` that contains a _page type_.
+
+This is usually  `fluidPage` but others exist (e.g. `navbarPage`). For example:
+
+
+
+```r
+shinyUI(
+  fluidPage(
+    ## panels, tabs, text, outputs (e.g. plots, tables etc) go here
+  )
+)
+```
+
+Here is a simple `ui.R` file in the folder `simple_app`:
+
+
+```r
+library(shiny)
+shinyUI(
+  fluidPage(
+    plotOutput("that_plot") # grab an output element with this name
+  )
+)
+```
+
+
+
+---
+
+# The `server.R` File
+
+This file should contain a function called `shinyServer` with arguments `input` and `output`. Both are lists:
+
+ * `input` will have any variables or data passed in from the user via the UI (examples will be seen later)
+ 
+ * any objects that we want to pass back to the UI will be contained in `output` using special functions for the type of output. 
+ 
+
+```r
+## A bare bones server.R file contains:
+shinyServer(
+  function(input, output) {
+    ## some R code
+  }
+)
+```
+
+---
+
+# The `server.R` Outputs
+
+The `shiny` package (and others) contains functions that encapsulate different types of objects/outputs that you want to throw back to the `ui.R` file. 
+ 
+For example, we will want to send an image back with in an output element called `"that_plot"` so we will use the `renderPlot` function. 
+
+Other functions:
+
+
+```r
+library(shiny)
+apropos("^render")
+```
+
+```
+## [1] "renderCachedPlot" "renderDataTable"  "renderImage"     
+## [4] "renderPlot"       "renderPrint"      "renderTable"     
+## [7] "renderText"       "renderUI"
+```
+
+
+---
+
+# Our `server.R` File
+
+
+```r
+library(shiny)
+library(ggplot2)
+data(mpg)
+shinyServer(
+  function(input, output) {
+    ## Recall that the UI file had `plotOutput("that_plot")`
+    output$that_plot &lt;- renderPlot(
+      ggplot(mpg, aes(x = displ, y = cty)) +  geom_point() + theme_bw() 
+    )
+  }
+)
+```
+
+ 
+To test it in R on your computer, point the `runApp` function towards the place where you saved the shiny application:
+
+
+```r
+library(shiny)
+runApp("c:\\path\\to\\simple_app")
+```
+
+
+---
+
+# Application 2: A Little More Complicated...
+
+Let's add some UI elements. For example, we can add a [loess fit](https://en.wikipedia.org/wiki/Local_regression) to the plot and let the user control the smoothness of the function.
+
+To do this, we need to:
+
+ 1. make space for a UI element
+ 2. add a controller to let the user choose the smoothness
+ 3. pass that value to the `ggplot` code
+ 4. update the plot when the user changes the input
+
+The example code is in the `sidebar_app` directory. 
+
+---
+
+# Step 1: Make Space for a UI Element
+
+First, let's arrange the application so that the user's input is on the left-hand side and the plot is to the right. 
+
+An easy way to do this is to use a _sidebar_. Our UI file will change to reflect what goes into the sidebar (i.e. the input device) and the main panel (the plot). 
+
+![](example_layout.tiff)
+
+
+---
+
+# Step 1: Make Space for a UI Element
+
+
+```r
+shinyUI(
+  fluidPage(
+    sidebarLayout(
+      sidebarPanel(
+        ## add UI elements here
+        ## adding more stacks them in rows
+      ),
+      mainPanel(
+        ## Add our plot output here
+        ## Additional outputs also stack
+      )
+    )
+  )
+)
+```
+
+
+---
+
+# Basic UI Elements
+
+![](basic-widgets.png)
+
+See the [Shiny Widgets Gallery](http://shiny.rstudio.com/gallery/widget-gallery.html) to interactively play with the code that defines these. 
+
+
+---
+
+# Step 2: Add a Controller
+
+Let's use a slider to control how smooth the line is via the `span` argument of the `loess` function:
+
+
+```r
+library(shiny)
+shinyUI(
+  fluidPage(
+    sidebarLayout(
+      sidebarPanel(
+        sliderInput(inputId = "span", label = "Smoother Span:",  
+                    min = .2, max = 1, value = .8)
+      ), # sidebarPanel
+      mainPanel(plotOutput("that_plot"))
+    ) # sidebarLayout
+  ) # fluidPage
+) # shinyUI
+```
+
+We could add multiple items to the sidebar and main panels.
+
+---
+
+# Step 3: Pass the Value to the `ggplot` Code
+
+In the UI file, our `sliderInput` code had `inputId = "span"`. 
+
+In the server file, the `input` list will have an element called `"span"`. 
+
+
+```r
+library(shiny)
+library(ggplot2)
+data(mpg)
+
+shinyServer(
+  function(input, output) {
+    output$that_plot &lt;- renderPlot(
+      ggplot(mpg, aes(x = displ, y = cty)) + 
+        geom_point() + theme_bw() +
+        geom_smooth(method = loess, span = input$span)
+    ) # that_plot
+  } # function
+) # shinyServer
+```
+
+
+---
+
+#  Step 4: Update the Plot 
+
+Magic!
+
+`shiny` has a feature called _reactivity_ where the server code is called whenever a UI element is changed. It is automatic.
+
+Notes/pro-tips:
+
+ * There are ways to defer the updating. You could add an action button (i.e. "Compute!") that will control when the calculations start
+ * UI elements can be reactive. You can have the `server.R` file determine what should be in the UI and send those elements back as output. 
+ 
+ In the second case, you may want the UI to show the column names in your data set after the data have been read into R (this is the next example). 
+
+
+---
+
+#  Application 3: Uploading and Using Data 
+
+Let's create another application that:
+
+ * allows the user to upload a CSV file
+ * choose a column to analyze
+ * plot and summarize the data
+
+This process will illustrate some new aspects of the system.
+
+The example code is in the `roundtrip` directory. 
+
+You can test it with any CSV file with data but the application directory has an example file called `safety_data.csv`. 
+
+
+---
+
+#  Uploading Files 
+
+`shiny` has a UI capability that lets the user choose a local file and upload it to a temporary location called `fileInput`.
+
+This goes in the `ui.R` file:
+
+
+```r
+fileInput(inputId = 'csv_file', 
+          label = 'Choose CSV File',
+          accept = c('text/csv', 
+                     'text/comma-separated-values,text/plain', 
+                     '.csv'))
+```
+
+In R, the resulting `input$csv_file` can look something like this:
+
+&lt;pre&gt;
+'data.frame':	1 obs. of  4 variables:
+ $ name    : chr "iris.csv"
+ $ size    : int 2316
+ $ type    : chr "text/csv"
+ $ datapath: chr "/var/folders/ps/v0w2_8_x7kzcgfwmvl4n/T/f2a24e46c/0"
+ &lt;/pre&gt;
+
+---
+
+#  Catching the File in `server.R` 
+
+We can write a explicitly _reactive_ function that ensures updating when the UI is changed:
+
+
+```r
+shinyServer(
+  function(input, output) {  
+    get_data &lt;- reactive({
+      ## Before the user chooses a file, we make sure that nothing is produced...
+      if (is.null(input$csv_file)) return(NULL) 
+      read.csv(input$csv_file$datapath)
+    }) 
+  }
+)
+```
+
+We use the `reactive` function because we will not generate an object for the `output` list (not yet at least). 
+
+---
+
+#  Getting the Column Names 
+
+We want to be able to choose a column from our data and feed it back into the UI file so that the user can choose.  
+
+We return the column names that are numeric. There may not be any, which results in a vector of length zero. 
+
+
+```r
+shinyServer(
+  function(input, output) {  
+    ## `get_data`goes inside `shinyServer` too but is not shown here for simplicity
+    get_col_names &lt;- reactive({
+      dat &lt;- get_data()
+      if (is.null(dat)) return(NULL) 
+      num_cols &lt;- unlist(lapply(dat, function(x) is.numeric(x)))
+      names(num_cols)[num_cols]
+    }) 
+  }
+)
+```
+
+
+---
+
+#  So far...
+
+ Step 1: `ui.R` passes the file information to `server.R`  
+ 
+ Step 2: `server.R` reads the data and finds the column names
+ 
+ Step 3: `server.R` passes the numeric column names back to `ui.R` using:
+
+
+```r
+output$value_choice &lt;- renderUI({
+  columns &lt;- get_col_names()
+  if(is.null(columns)) return(NULL) else 
+    selectInput(inputId = "value_col", label = "Analysis Column", 
+                choices = unique(c("None Selected", columns)))
+})
+```
+
+ Step 4: `ui.R` shows the results to the user via
+
+
+```r
+uiOutput("value_choice")
+```
+
+Now let's look at how we create and display text and plots... 
+
+
+---
+
+#  Text Output
+ 
+As an example of writing some text out to the user interface, this function is contained inside of the `shinyServer` call within `server.R`:
+
+
+```r
+output$description &lt;- renderText({
+  dat &lt;- get_data()
+  ## In case we haven't uploaded data yet or obtained a column name:
+  if (is.null(dat) | !check_input(input$value_col)) return(NULL) 
+  dat &lt;- dat[, input$value_col]
+  num_missing &lt;- sum(is.na(dat))
+  paste0("For these data, there were ", sum(!is.na(dat)),
+         " data points and ", ifelse(num_missing == 0, " no ", num_missing),
+         " missing values.")
+}) 
+```
+
+where
+
+
+```r
+check_input &lt;- function(x) !is.null(x) &amp;&amp; x != "None Selected"
+```
+
+
+
+---
+
+#  Plot Output
+ 
+In `ui.R`, another controller was added to show a discrete choice:
+
+
+```r
+ radioButtons(inputId = "log_it", label = "Log Scale?", choices =c("Yes", "No"))
+```
+
+and `server.R` contains:
+
+
+```r
+output$histogram &lt;- renderPlot({
+  dat &lt;- get_data()
+  if (is.null(dat) | !check_input(input$value_col)) return(NULL) 
+  out &lt;- ggplot(dat, aes_string(x = input$value_col)) + 
+    geom_histogram(alpha = .7, fill = "red", col = "red") + theme_bw()
+  if(input$log_it == "Yes") out &lt;- out + scale_x_log10()
+  out
+}) 
+```
+
+---
+
+#  Output in the UI file
+ 
+In order to show these results to the user, the main panel contains two outputs:
+
+
+```r
+mainPanel(
+  textOutput("description"),
+  tags$br(),
+  plotOutput("histogram")
+) 
+```
+
+The line `tags$br()` adds a little space between the two outputs.
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "16:9",
+"highlightLanguage": "R",
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
