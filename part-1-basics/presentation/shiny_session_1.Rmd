@@ -48,7 +48,7 @@ Here are some instances that meld statistics and visualizations:
 
 # Advantages 
 
- * all the software is free ("as in beer" and "as is speech"")
+ * `shiny` is free ("as in beer" and "as is speech"")`*`
  * you can install it anywhere without worrying about licenses
  * it is well-supported (officially and unofficially) and well-developed
  * it integrates with modern web features (e.g. HTML, Javascript, Google Widgets, css, JSON, markdown, etc)
@@ -58,12 +58,13 @@ Here are some instances that meld statistics and visualizations:
  * great integration with RStudio 
  * rich user-interface capabilities 
  * dozens of `shiny` related packages on CRAN and Bioconductor, thousands of [related github repositories](http://bit.ly/1PyOUwg)
+ 
+`*` _Some_ deployment options (RStudio Connect, ShinyApps.io) ar enot free
 
 ---
 
 # Disadvantages
 
- * somewhat fluid due to being early in its lifespan
  * need to know `R`
  * requires a web server to let other people use the applications
  * typically does not enable _large_ scale interactive data analysis 
@@ -78,7 +79,7 @@ Here are some instances that meld statistics and visualizations:
  * [Gallery/examples](http://shiny.rstudio.com/gallery/)
  * Stackoverflow [`shiny` questions](http://stackoverflow.com/questions/tagged/?tagnames=shiny&sort=newest)
  * [`shiny` on CRAN](https://cran.r-project.org/package=shiny)
- * `shiny` articles on [R-Bloggers](http://www.r-bloggers.com/search/shiny)
+ * `shiny` articles on [R-Bloggers](https://cse.google.com/cse?cx=005359090438081006639%3Apaz69t-s8ua&ie=UTF-8&q=shiny&sa=Go)
  * [github repository](https://github.com/rstudio/shiny)
  * [other shiny github projects](http://bit.ly/1PyOUwg)
 
@@ -101,20 +102,14 @@ Our goal for this workshop is:
 
 A shiny application is usually contained in a specific directory. 
 
-The typical structure of an application directory is to have at least two files:
+The typical structure of an application directory is to have at least one file (`app.R`). 
 
-```
-Application/Directory
-|-- server.R
-`-- ui.R
-```
+ * Older applications sometimes use two files (`server.R` and `ui.R`)
 
-Th ui file controls how the application looks and its structure. 
-
-The server file defines the calculations and outputs.
+A shiny application usually has a UI (user-interface) component and a server component.  
 
 The directory can have other files, such as `RData` files with results or data. 
-
+ 
 ---
 
 # Application 1: Show a plot in the browser
@@ -122,63 +117,60 @@ The directory can have other files, such as `RData` files with results or data.
 We have a set of example applications in the workshop materials:
 
 <pre>
-|-- simple_app
-|   |-- ui.R
-|   `-- server.R
-|-- sidebar_app
-|   |-- ui.R
-|   `-- server.R
-`-- roundtrip
-    |-- ui.R
-    |-- server.R
-    `-- safety_data.csv
+├── simple_app
+│   └── app.R
+├── sidebar_app
+│   └── app.R
+└── roundtrip
+    ├── app.R
+    └── safety_data.csv
 </pre>
 
 Our first application is `simple_app`.
 
 ---
 
-# The `ui.R` File
+# The UI Part
 
-The UI file contains a function call `shinyUI` that contains a _page type_.
+The UI component contains an R object that has information on the  _page type_ and any _control objects_. 
 
-This is usually  `fluidPage` but others exist (e.g. `navbarPage`). For example:
+An example would be created using the `fluidPage()` function but others exist (e.g. `navbarPage()`). For example:
 
 
 ```{r ui_pseudo, eval=FALSE}
-shinyUI(
+ui_part <- 
   fluidPage(
     ## panels, tabs, text, outputs (e.g. plots, tables etc) go here
   )
-)
 ```
 
-Here is a simple `ui.R` file in the folder `simple_app`:
+Here is a simple UI compnent for `simple_app` that just shows a plot:
 
 ```{r ui_simple, eval=FALSE}
 library(shiny)
-shinyUI(
+
+ui_part <- 
   fluidPage(
     plotOutput("that_plot") # grab an output element with this name
   )
-)
 ```
 
 
 
 ---
 
-# The `server.R` File
+# The Server Part
 
-This file should contain a function called `shinyServer` with arguments `input` and `output`. Both are lists:
+The server object is an R function that has two arguments:
 
  * `input` will have any variables or data passed in from the user via the UI (examples will be seen later)
  
  * any objects that we want to pass back to the UI will be contained in `output` using special functions for the type of output. 
  
+ * another argument, `session`, can be used but won't be discussed here
+ 
 ```{r server_example, eval=FALSE}
-## A bare bones server.R file contains:
-shinyServer(
+server_part <- 
   function(input, output) {
     ## some R code
   }
@@ -187,9 +179,9 @@ shinyServer(
 
 ---
 
-# The `server.R` Outputs
+# The Server Outputs
 
-The `shiny` package (and others) contains functions that encapsulate different types of objects/outputs that you want to throw back to the `ui.R` file. 
+The `shiny` package (and others) contains functions that encapsulate different types of objects/outputs that you want to throw back to the UI. 
  
 For example, we will want to send an image back with in an output element called `"that_plot"` so we will use the `renderPlot` function. 
 
@@ -203,20 +195,25 @@ apropos("^render")
 
 ---
 
-# Our `server.R` File
+# Our `app.R` File
 
 ```{r server_simple, eval=FALSE}
 library(shiny)
 library(ggplot2)
-data(mpg)
-shinyServer(
-  function(input, output) {
-    ## Recall that the UI file had `plotOutput("that_plot")`
-    output$that_plot <- renderPlot(
-      ggplot(mpg, aes(x = displ, y = cty)) +  geom_point() + theme_bw() 
-    )
-  }
-)
+
+ui_part <- 
+  fluidPage(
+    plotOutput("that_plot") # grab an output element with this name
+  )
+
+server_part <- function(input, output) {
+  ## The output name ("that_plot") matches the inuput above
+  output$that_plot <- renderPlot(
+    ggplot(mpg, aes(x = displ, y = cty)) +  geom_point() + theme_bw() 
+  )
+}
+
+shinyApp(ui = ui_part, server = server_part)
 ```
 
  
@@ -259,7 +256,7 @@ An easy way to do this is to use a _sidebar_. Our UI file will change to reflect
 # Step 1: Make Space for a UI Element
 
 ```{r layout_slider, eval=FALSE}
-shinyUI(
+ui <- 
   fluidPage(
     sidebarLayout(
       sidebarPanel(
@@ -272,7 +269,6 @@ shinyUI(
       )
     )
   )
-)
 ```
 
 
@@ -280,7 +276,9 @@ shinyUI(
 
 # Basic UI Elements
 
-![](basic-widgets.png)
+```{r widgets, out.width="80%", echo = FALSE}
+knitr::include_graphics("basic-widgets.png")
+```
 
 See the [Shiny Widgets Gallery](http://shiny.rstudio.com/gallery/widget-gallery.html) to interactively play with the code that defines these. 
 
@@ -292,8 +290,7 @@ See the [Shiny Widgets Gallery](http://shiny.rstudio.com/gallery/widget-gallery.
 Let's use a slider to control how smooth the line is via the `span` argument of the `loess` function:
 
 ```{r ui_slider, eval=FALSE}
-library(shiny)
-shinyUI(
+ui <- 
   fluidPage(
     sidebarLayout(
       sidebarPanel(
@@ -303,7 +300,6 @@ shinyUI(
       mainPanel(plotOutput("that_plot"))
     ) # sidebarLayout
   ) # fluidPage
-) # shinyUI
 ```
 
 We could add multiple items to the sidebar and main panels.
@@ -312,24 +308,19 @@ We could add multiple items to the sidebar and main panels.
 
 # Step 3: Pass the Value to the `ggplot` Code
 
-In the UI file, our `sliderInput` code had `inputId = "span"`. 
+In the UI component, our `sliderInput` code had `inputId = "span"`. 
 
 In the server file, the `input` list will have an element called `"span"`. 
 
 ```{r server_slider, eval=FALSE}
-library(shiny)
-library(ggplot2)
-data(mpg)
-
-shinyServer(
+server <- 
   function(input, output) {
     output$that_plot <- renderPlot(
       ggplot(mpg, aes(x = displ, y = cty)) + 
         geom_point() + theme_bw() +
-        geom_smooth(method = loess, span = input$span)
+        geom_smooth(method = "loess", span = input$span)
     ) # that_plot
   } # function
-) # shinyServer
 ```
 
 
@@ -339,12 +330,13 @@ shinyServer(
 
 Magic!
 
-`shiny` has a feature called _reactivity_ where the server code is called whenever a UI element is changed. It is automatic.
+`shiny` has a feature called _reactivity_ where the server code is called whenever a UI element is changed and it requires the code to be re-run. It is automatic but lazy.
 
 Notes/pro-tips:
 
  * There are ways to defer the updating. You could add an action button (i.e. "Compute!") that will control when the calculations start
- * UI elements can be reactive. You can have the `server.R` file determine what should be in the UI and send those elements back as output. 
+ 
+ * UI elements can be reactive. You can have the server component determine what should be in the UI and send those elements back as output. 
  
  In the second case, you may want the UI to show the column names in your data set after the data have been read into R (this is the next example). 
 
@@ -372,7 +364,7 @@ You can test it with any CSV file with data but the application directory has an
 
 `shiny` has a UI capability that lets the user choose a local file and upload it to a temporary location called `fileInput`.
 
-This goes in the `ui.R` file:
+The UI component will have an _input handeler_:
 
 ```{r fileInput, eval=FALSE}
 fileInput(inputId = 'csv_file', 
@@ -394,23 +386,24 @@ In R, the resulting `input$csv_file` can look something like this:
 
 ---
 
-#  Catching the File in `server.R` 
+#  Catching the File in the Server 
 
 We can write a explicitly _reactive_ function that ensures updating when the UI is changed:
 
 ```{r server_fileInput, eval=FALSE}
-shinyServer(
+server <- 
   function(input, output) {  
     get_data <- reactive({
       ## Before the user chooses a file, we make sure that nothing is produced...
-      if (is.null(input$csv_file)) return(NULL) 
+      req(input$csv_file)
       read.csv(input$csv_file$datapath)
     }) 
   }
-)
 ```
 
 We use the `reactive` function because we will not generate an object for the `output` list (not yet at least). 
+
+`req()` is a cool function that doesn't do anything if the user [hasn't supplied input](http://shiny.rstudio.com/articles/req.html).
 
 ---
 
@@ -421,17 +414,11 @@ We want to be able to choose a column from our data and feed it back into the UI
 We return the column names that are numeric. There may not be any, which results in a vector of length zero. 
 
 ```{r server_col_names, eval=FALSE}
-shinyServer(
-  function(input, output) {  
-    ## `get_data`goes inside `shinyServer` too but is not shown here for simplicity
-    get_col_names <- reactive({
-      dat <- get_data()
-      if (is.null(dat)) return(NULL) 
-      num_cols <- unlist(lapply(dat, function(x) is.numeric(x)))
-      names(num_cols)[num_cols]
-    }) 
-  }
-)
+get_col_names <- reactive({
+  dat <- get_data()
+  num_cols <- vapply(dat, is.numeric, logical(1))
+  names(num_cols)[num_cols]
+}) 
 ```
 
 
@@ -439,25 +426,24 @@ shinyServer(
 
 #  So far...
 
- Step 1: `ui.R` passes the file information to `server.R`  
+ Step 1: UI passes the file information to server  
  
- Step 2: `server.R` reads the data and finds the column names
+ Step 2: server reads the data and finds the column names
  
- Step 3: `server.R` passes the numeric column names back to `ui.R` using:
+ Step 3: server passes the numeric column names back to the UI using:
 
 ```{r server_value_choice, eval=FALSE}
-output$value_choice <- renderUI({
+output$column_choice <- renderUI({
   columns <- get_col_names()
-  if(is.null(columns)) return(NULL) else 
     selectInput(inputId = "value_col", label = "Analysis Column", 
-                choices = unique(c("None Selected", columns)))
+                choices = unique(c("None Selected" = "", columns)))
 })
 ```
 
- Step 4: `ui.R` shows the results to the user via
+ Step 4: UI shows the results to the user via
 
 ```{r server_value_choice_ui, eval=FALSE}
-uiOutput("value_choice")
+uiOutput("column_choice")
 ```
 
 Now let's look at how we create and display text and plots... 
@@ -467,14 +453,13 @@ Now let's look at how we create and display text and plots...
 
 #  Text Output
  
-As an example of writing some text out to the user interface, this function is contained inside of the `shinyServer` call within `server.R`:
+As an example of writing some text out to the user interface, this function is contained inside of the `shinyApp` call within the server:
 
 ```{r server_description, eval=FALSE}
 output$description <- renderText({
+  req(input$value_col)
   dat <- get_data()
-  ## In case we haven't uploaded data yet or obtained a column name:
-  if (is.null(dat) | !check_input(input$value_col)) return(NULL) 
-  dat <- dat[, input$value_col]
+  dat <- dat[[ input$value_col]]
   num_missing <- sum(is.na(dat))
   paste0("For these data, there were ", sum(!is.na(dat)),
          " data points and ", ifelse(num_missing == 0, " no ", num_missing),
@@ -482,33 +467,28 @@ output$description <- renderText({
 }) 
 ```
 
-where
-
-```{r server_check_input, eval=FALSE}
-check_input <- function(x) !is.null(x) && x != "None Selected"
-```
-
-
 
 ---
 
 #  Plot Output
  
-In `ui.R`, another controller was added to show a discrete choice:
+In the UI, another controller was added to show a discrete choice:
 
 ```{r ui_radio, eval=FALSE}
- radioButtons(inputId = "log_it", label = "Log Scale?", choices =c("Yes", "No"))
+checkboxInput(inputId = "log_scale", label = "Log Scale?", TRUE)
 ```
 
-and `server.R` contains:
+and the server contains:
 
 ```{r server_hist, eval=FALSE}
-output$histogram <- renderPlot({
+renderPlot({
   dat <- get_data()
-  if (is.null(dat) | !check_input(input$value_col)) return(NULL) 
-  out <- ggplot(dat, aes_string(x = input$value_col)) + 
-    geom_histogram(alpha = .7, fill = "red", col = "red") + theme_bw()
-  if(input$log_it == "Yes") out <- out + scale_x_log10()
+  out <- ggplot(dat, aes_string(x = input$value_col)) +
+    geom_histogram(alpha = .7, fill = "red", col = "red") + 
+    theme_bw()
+  if (input$log_scale) {
+    out <- out + scale_x_log10()
+  }
   out
 }) 
 ```
