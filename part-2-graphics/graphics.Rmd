@@ -69,7 +69,7 @@ We have data on some compounds measured under different conditions:
  * **type**: screening (via single point conc) vs confirmation (via IC50 dose-response)
  * **target** format: the drug target
 
-```{r}
+```{r, message = FALSE}
 library(ggplot2)
 library(readr)
 assays <- read_csv("IC50_data.csv")
@@ -200,14 +200,14 @@ ggplotly(p)
 
 ]
 .pull-right[
-```{r plotly-show, results='asis', comment = NA, message=FALSE,warning=FALSE, echo = FALSE, eval = FALSE}
+```{r plotly-show, results='asis', comment = NA, message=FALSE,warning=FALSE, echo = FALSE, eval = TRUE}
 unloadNamespace(ggiraph)
 library(plotly)
 p <- 
   base_plot + 
   geom_point(aes(text = paste("Compound:", Compound)), 
              size = 4, alpha = .4) 
-ggplotly(p)
+ggplotly(p, width = 480, height = 440)
 ```
 ]
 
@@ -346,9 +346,10 @@ rbokehOutput("new_scatter")
 
 The CRAN Task view on [Web Technologies](https://cran.r-project.org/web/views/WebTechnologies.html) has a curated list of `shiny` and javascript visualization packages (and more)
   
-.font60[
+.font70[
 
 ```{r}
+options(width = 180)
 sessionInfo()
 ```
 

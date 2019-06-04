@@ -527,3 +527,15 @@ mainPanel(
 
 The line `tags$br()` adds a little space between the two outputs. 
 
+---
+
+# Session Info
+
+.font60[
+
+```{r}
+sessionInfo()
+```
+
+]
+

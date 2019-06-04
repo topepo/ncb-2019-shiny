@@ -1,3 +1,4 @@
+library(ggplot2)
 library(readr)
 assays <- read_csv("IC50_data.csv")
 

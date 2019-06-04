@@ -1,23 +1,22 @@
-load("assays.RData")
-assays$hover <- as.character(assays$Compound)
-assays$click <- paste0("function() {window.open('http://pronto.pfizer.com/pronto/?cmpdid=",
-                       as.character(assays$Compound), "')}")
+library(ggplot2)
+library(readr)
+assays <- read_csv("IC50_data.csv")
 
 ## Set the default ggplot theme upfront
 theme_set(theme_bw())
 
 shinyServer(function(input, output, session) {
   output$orig_scatter <- renderPlot({
-    ggplot(data = assays, aes(x = Single_Point, y = Dose_Response, color = Assay)) +
+    ggplot(data = assays, aes(x = Single_Point, y = Dose_Response, color = Target)) +
       geom_point(size = 4, alpha = .4) +
       geom_smooth(se = FALSE) +  scale_y_log10()
   }) ## output$orig_scatter  
   
   output$new_scatter <- renderggiraph({
-    p <- ggplot(data = assays, aes(x = Single_Point, y = Dose_Response, color = Assay)) +
-      geom_point_interactive(aes(tooltip = hover, onclick = click), size = 4, alpha = .4) + 
+    p <- ggplot(data = assays, aes(x = Single_Point, y = Dose_Response, color = Target)) +
+      geom_point_interactive(aes(tooltip = Compound), size = 4, alpha = .4) + 
       geom_smooth(se = FALSE) +  scale_y_log10()
-    ggiraph(code = {print(p)}, width = 8, height = 5.5)
+    ggiraph(ggobj = p, width = 1)
   }) ## output$new_scatter  
 
 }) # End Shiny Server
