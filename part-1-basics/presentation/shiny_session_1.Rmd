@@ -39,6 +39,8 @@ Here are some instances that meld statistics and visualizations:
  * [Visual Algorithms for the Traveling Salesman Problem](https://gallery.shinyapps.io/shiny-salesman/)
  * [Airline Performance Comparison](http://nycdatascience.com/airline-performance-comparison-with-rshiny/)
  * [Playing with Google Analytics Data](https://mcpasin.shinyapps.io/PlayingGoogleAnalyticsDataViz)
+ * [Visualize and Explore an Entire Genome](https://gallery.shinyapps.io/genome_browser/)
+ * [Inter-Individual Variability in Pharmacokinetics](http://shiny.webpopix.org/stat/pkiiv1/)
  * [Crime Data Visualisation](https://blenditbayes.shinyapps.io/crimemap/)
  * [Process Mass Intensity (PMI) for Chemical Synthesis route](https://acsgcipr-predictpmi.shinyapps.io/pmi_calculator/)
 
