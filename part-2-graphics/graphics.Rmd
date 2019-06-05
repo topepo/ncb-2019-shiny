@@ -94,7 +94,9 @@ p
 
 ---
 
-## Graphical queries in shiny
+# Graphical queries in shiny
+
+We can leverage **shiny**'s "static interactivity" to get at the data behind a hovered (or clicked or brushed) point(s).
 
 ```r
 library(shiny)
@@ -118,7 +120,7 @@ Learn more about plot interactions in **shiny** <https://shiny.rstudio.com/artic
 
 ---
 
-## Getting more interactive
+# Getting more interactive
 
 **shiny**'s static plot interaction is great for getting user input from one view and sending it to another (e.g. displaying a table of selected point(s)).
 
@@ -251,7 +253,7 @@ plotly_example("shiny", "event_data_3D")
 
 ---
 
-# `ggiraph`
+# ggiraph
 
 **plotly**'s `ggplotly()` doesn't always get the conversion right. **ggiraph** does a better at preserving the look, but doesn't have quite as many interactive features as **plotly**.
 
@@ -308,17 +310,11 @@ ggiraph(ggobj = ggiraph_ggplot, width = 1)
 ```r
 library(shiny)
 library(ggiraph)
-
 ggiraph_ggplot <- 
   ggplot(assays, aes(x = Single_Point, y = Dose_Response, color = Target)) +
-  geom_point_interactive(
-    aes(tooltip = Compound, data_id = Compound), 
-    size = 4, 
-    alpha = .4
-  ) +
-  geom_smooth(se = FALSE) +  
-  scale_y_log10()
-
+  geom_point_interactive(aes(tooltip = Compound, data_id = Compound), size = 4, alpha = .4) +
+  geom_smooth(se = FALSE) + scale_y_log10()
+  
 ui <- fluidPage(
   girafeOutput("plot"),
   tableOutput("table")
@@ -333,12 +329,8 @@ server <- function(input, output, session) {
       selected_css = "fill:red;"
     )
   })
-  
-  output$table <- renderTable({
-    filter(assays, Compound %in% input$plot_selected)
-  })
+  output$table <- renderTable(filter(assays, Compound %in% input$plot_selected))
 }
-
 shinyApp(ui, server)
 ```
 
