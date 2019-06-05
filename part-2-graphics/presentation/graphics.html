@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>Part 2: Interactive Graphics</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Max Kuhn (RStudio) and Carson Sievert (RStudio)" />
+    <script src="libs/htmlwidgets-1.3/htmlwidgets.js"></script>
+    <script src="libs/d3-5.7.0/d3.min.js"></script>
+    <script src="libs/d3-lasso-0.0.5/d3-lasso.min.js"></script>
+    <link href="libs/ggiraphjs-0.1.0/styles.css" rel="stylesheet" />
+    <script src="libs/ggiraphjs-0.1.0/ggiraphjs.min.js"></script>
+    <script src="libs/girafe-binding-0.6.1/girafe.js"></script>
+    <link rel="stylesheet" href="mtheme_max.css" type="text/css" />
+    <link rel="stylesheet" href="fonts_mtheme_max.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Part 2: Interactive Graphics
+### Max Kuhn (RStudio) and Carson Sievert (RStudio)
+
+---
+
+
+
+
+
+
+
+## These Slides
+
+Can be found at [https://github.com/topepo/ncb-2019-shiny](https://github.com/topepo/ncb-2019-shiny).
+
+---
+
+# Towards interactivity
+
+R has made big improvements on their graphics capabilities with [`lattice`](https://cran.r-project.org/package=lattice) and [`ggplot2`](https://cran.r-project.org/package=ggplot2)
+
+However, these are _static_ graphics and could be improved with interactive capabilities. 
+
+With **shiny**, it's actually possible to layer interaction on top of static R plots! Let's consider a small example.
+
+---
+
+# Example Data
+
+.pull-left[
+We have data on some compounds measured under different conditions:
+
+ * _type_: screening (via single point conc) vs confirmation (via IC50 dose-response)
+ * _target_: the drug target
+ 
+]
+.pull-right[
+
+We will plot the screening result versus the confirmation IC50 for both formats. If we only have the screening results, how have those related to the more definitive IC50?
+
+]
+
+
+.code70[
+
+
+```r
+library(ggplot2)
+library(readr)
+assays &lt;- read_csv("https://raw.githubusercontent.com/topepo/ncb-2019-shiny/master/data/IC50_data.csv")
+str(assays)
+```
+
+```
+## Classes 'spec_tbl_df', 'tbl_df', 'tbl' and 'data.frame':	117 obs. of  4 variables:
+##  $ Compound     : chr  "Mol-2082" "Mol-1343" "Mol-724" "Mol-6779" ...
+##  $ Single_Point : num  37.5 81.3 74.8 81.9 74.8 ...
+##  $ Dose_Response: num  51.4 72 61.9 37.3 34.2 ...
+##  $ Target       : chr  "A" "A" "A" "A" ...
+##  - attr(*, "spec")=
+##   .. cols(
+##   ..   Compound = col_character(),
+##   ..   Single_Point = col_double(),
+##   ..   Dose_Response = col_double(),
+##   ..   Target = col_character()
+##   .. )
+```
+
+]
+
+We will plot the screening result versus the confirmation IC50 for both formats. If we only have the screening results, how have those related to the more definitive IC50?
+
+---
+
+# Setting the ggplot theme
+
+
+```r
+thm &lt;- theme_bw() + 
+  theme(
+    panel.background = element_rect(fill = "transparent", colour = NA), 
+    plot.background = element_rect(fill = "transparent", colour = NA),
+    legend.position = "top",
+    legend.background = element_rect(fill = "transparent", colour = NA),
+    legend.key = element_rect(fill = "transparent", colour = NA)
+  )
+theme_set(thm)
+```
+
+---
+
+# Screening results
+
+.pull-left[
+```r
+p &lt;- ggplot(
+  data = assays, 
+    aes(
+      x = Single_Point, 
+      y = Dose_Response, 
+      color = Target
+    )
+  ) +
+  geom_point(size = 4, alpha = .4) +
+  geom_smooth(se = FALSE) +  
+  scale_y_log10()
+p
+```
+
+What about that point with a low `Dose_Response`? What compound is it?
+]
+
+
+.pull-right[
+![](graphics_files/figure-html/unnamed-chunk-2-1.png)&lt;!-- --&gt;
+]
+
+
+
+---
+
+# Graphical queries in shiny
+
+We can leverage **shiny**'s "static interactivity" to get at the data behind a hovered (or clicked or brushed) point(s).
+
+```r
+library(shiny)
+
+ui &lt;- fluidPage(
+  # Exposes hover info on the server as `input$hover`
+  # Can also do this with click or brush
+  plotOutput("plot", hover = "hover"),
+  tableOutput("table")
+)
+
+server &lt;- function(input, output, session) {
+  output$plot &lt;- renderPlot(p)
+  output$table &lt;- renderTable(nearPoints(assays, input$hover))
+}
+
+shinyApp(ui, server)
+```
+
+Learn more about plot interactions in **shiny** &lt;https://shiny.rstudio.com/articles/#graphics&gt;
+
+---
+
+# Getting more interactive
+
+**shiny**'s static plot interaction is great for getting user input from one view and sending it to another (e.g. displaying a table of selected point(s)).
+
+Sometimes it pays off if the graphic itself is web-based and interactive. Many R packages can produce these via the **htmlwidgets** package, which provides a consistent interface across different contexts (e.g., R console, RStudio, shiny, rmarkdown, etc)
+  * To see a gallery of the most popular htmlwidgets (we'll cover some of these) -- https://gallery.htmlwidgets.org/
+  * To learn more about htmlwidgets itself -- http://www.htmlwidgets.org/
+    
+Today we'll introduce two interactive graphing libraries: **ggiraph** and **plotly**. 
+  * If you know **ggplot2**, you can easily use these packages to make your static graphs interactive.
+  * Due to their different approaches, **ggiraph** does a better job of maintaining the look and feel of the **ggplot2** graph, but **plotly** provides a more fully-featured and extensible framework (you can also use it without **ggplot2**).
+  
+---
+# `plotly`
+
+It's easiest to get started with **plotly**'s `ggplotly()`. This function converts a static **ggplot2** to an interactive web-based graphic.
+
+.pull-left[
+
+.code70[
+
+```r
+library(plotly)
+
+p &lt;- ggplot(data = assays) +
+  aes(x = Single_Point, y = Dose_Response, color = Target) +
+  geom_point(size = 4, alpha = .4) +
+  geom_smooth(se = FALSE) +  
+  scale_y_log10()
+  
+ggplotly(p)
+```
+
+]
+
+]
+
+.pull-right[
+&lt;iframe src="ggplotly.html" width="100%" height=500 scrolling="no" seamless="seamless" frameBorder="0"&gt;
+]
+
+  
+---
+# `plotly`
+
+It's easiest to get started with **plotly**'s `ggplotly()`. This function converts a static **ggplot2** to an interactive web-based graphic.
+
+.pull-left[
+
+.code70[
+
+```r
+library(plotly)
+
+p &lt;- ggplot(data = assays) +
+  aes(x = Single_Point, y = Dose_Response, color = Target) +
+  geom_point(aes(text = Compound), size = 4, alpha = .4) +
+  geom_smooth(se = FALSE) +  
+  scale_y_log10()
+  
+# Show only the text aes (instead of all of them) 
+# in the tooltip
+ggplotly(p, tooltip = "text")
+```
+]
+
+To control the tooltip that appears, use the `text` aesthetic (notice how `Compound` is now shown on hover).
+
+]
+
+.pull-right[
+&lt;iframe src="ggplotly-text.html" width="100%" height=500 scrolling="no" seamless="seamless" frameBorder="0"&gt;
+]
+
+
+---
+# `plotly`
+
+You can also make **plotly** graphs without **ggplot2**, which is useful for stuff like [3D charts](https://plotly-r.com/d-charts.html), [maps](https://plotly-r.com/maps.html), and generally having more control. Read more at &lt;https://plotly-r.com&gt; 
+
+.pull-left[
+
+
+```r
+plot_ly(
+  assays,
+  x = ~ Single_Point,
+  y = ~ Dose_Response,
+  color = ~ Target,
+  text = ~ Compound,
+  size = I(50),
+  alpha = 0.4
+) %&gt;%
+  layout(yaxis = list(type = "log"))
+```
+
+**plotly** also provides the building block for other useful packages like [**heatmaply**](https://cran.r-project.org/web/packages/heatmaply/vignettes/heatmaply.html) and [**TSStudio**](https://cran.r-project.org/web/packages/TSstudio/index.html)
+]
+
+.pull-right[
+&lt;iframe src="plotly.html" width="100%" height=500 scrolling="no" seamless="seamless" frameBorder="0"&gt;
+]
+
+
+---
+
+# Access plotly events in shiny
+
+```r
+library(shiny)
+
+ui &lt;- fluidPage(
+  plotlyOutput("plot"),
+  tableOutput("table")
+)
+
+server &lt;- function(input, output, session) {
+  output$plot &lt;- renderPlotly({
+    p &lt;- ggplot(assays, aes(x = Single_Point, y = Dose_Response, color = Target)) +
+      geom_point(aes(text = Compound, customdata = Compound), size = 4, alpha = .4) +
+      geom_smooth(se = FALSE) +  
+      scale_y_log10()
+    ggplotly(p, tooltip = "text")
+  })
+  # event_data() function can be used to access information about all sorts of events
+  output$table &lt;- renderTable({
+    hovered_compound &lt;- event_data("plotly_hover")$customdata
+    filter(assays, Compound %in% hovered_compound)
+  })
+  
+}
+
+shinyApp(ui, server)
+```
+
+---
+
+# Exercise
+
+Run the following example apps
+
+```r
+plotly_example("shiny", "event_data")
+plotly_example("shiny", "event_data_3D")
+```
+
+1. How many different plotly events are these apps showing? Can you trigger all of them?
+
+2. Modify the shiny app in the last slide to respond to click events instead of hover. Modify it again to respond to brush events.
+
+
+---
+
+# ggiraph
+
+**plotly**'s `ggplotly()` doesn't always get the conversion right. **ggiraph** does a better at preserving the look, but doesn't have quite as many interactive features as **plotly**.
+
+.pull-left[
+
+.code60[
+
+
+```r
+library(ggiraph)
+
+## We could add a column for click behavior:
+# assays$click &lt;- {a vector of urls}
+ggiraph_ggplot &lt;- 
+  ggplot(assays) +
+  aes(x = Single_Point, y = Dose_Response, color = Target) +
+  geom_point_interactive(
+    # could also add `onclick = click`
+    aes(tooltip = Compound), 
+    size = 4, 
+    alpha = .4
+  ) +
+  geom_smooth(se = FALSE) +  
+  scale_y_log10()
+
+## show using
+ggiraph(ggobj = ggiraph_ggplot, width = 1)
+```
+
+]
+
+Note the use of `geom_point_interactive()` instead of `geom_point()`.
+]
+
+
+.pull-right[
+<div id="htmlwidget-c32bdf8f39fda4dbd954" style="width:504px;height:504px;" class="girafe html-widget"></div>
+<script type="application/json" data-for="htmlwidget-c32bdf8f39fda4dbd954">{"x":{"html":"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" id=\"svg_35f543c1783020190604230157\" viewBox=\"0 0 432.00 360.00\">\n  <g>\n    <defs>\n      <clipPath id=\"cl_id35f51f669ade20190604230157_4\">\n        <rect x=\"0.00\" y=\"360.00\" width=\"0.00\" height=\"72.00\"/>\n      <\/clipPath>\n    <\/defs>\n    <rect x=\"0.00\" y=\"0.00\" width=\"432.00\" height=\"360.00\" id=\"1\" clip-path=\"url(#cl_id35f51f669ade20190604230157_4)\" fill=\"#FFFFFF\" fill-opacity=\"1\" stroke-width=\"0.75\" stroke=\"#FFFFFF\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <defs>\n      <clipPath id=\"cl_id35f51f669ade20190604230157_5\">\n        <rect x=\"0.00\" y=\"0.00\" width=\"432.00\" height=\"360.00\"/>\n      <\/clipPath>\n    <\/defs>\n    <rect x=\"0.00\" y=\"0.00\" width=\"432.00\" height=\"360.00\" id=\"2\" clip-path=\"url(#cl_id35f51f669ade20190604230157_5)\" fill=\"none\" stroke=\"none\"/>\n    <defs>\n      <clipPath id=\"cl_id35f51f669ade20190604230157_6\">\n        <rect x=\"45.57\" y=\"44.68\" width=\"380.95\" height=\"282.95\"/>\n      <\/clipPath>\n    <\/defs>\n    <rect x=\"45.57\" y=\"44.68\" width=\"380.95\" height=\"282.95\" id=\"3\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"none\" stroke=\"none\"/>\n    <polyline points=\"45.57,255.01 426.52,255.01\" id=\"4\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"0.533489\" stroke=\"#EBEBEB\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"45.57,176.48 426.52,176.48\" id=\"5\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"0.533489\" stroke=\"#EBEBEB\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"45.57,97.95 426.52,97.95\" id=\"6\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"0.533489\" stroke=\"#EBEBEB\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"67.55,327.63 67.55,44.68\" id=\"7\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"0.533489\" stroke=\"#EBEBEB\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"167.41,327.63 167.41,44.68\" id=\"8\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"0.533489\" stroke=\"#EBEBEB\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"267.26,327.63 267.26,44.68\" id=\"9\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"0.533489\" stroke=\"#EBEBEB\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"367.12,327.63 367.12,44.68\" id=\"10\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"0.533489\" stroke=\"#EBEBEB\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"45.57,294.27 426.52,294.27\" id=\"11\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#EBEBEB\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"45.57,215.74 426.52,215.74\" id=\"12\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#EBEBEB\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"45.57,137.22 426.52,137.22\" id=\"13\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#EBEBEB\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"45.57,58.69 426.52,58.69\" id=\"14\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#EBEBEB\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"117.48,327.63 117.48,44.68\" id=\"15\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#EBEBEB\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"217.34,327.63 217.34,44.68\" id=\"16\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#EBEBEB\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"317.19,327.63 317.19,44.68\" id=\"17\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#EBEBEB\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"417.05,327.63 417.05,44.68\" id=\"18\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#EBEBEB\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <circle cx=\"192.47\" cy=\"81.36\" r=\"3.47pt\" id=\"19\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"279.80\" cy=\"69.92\" r=\"3.47pt\" id=\"20\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"266.96\" cy=\"75.05\" r=\"3.47pt\" id=\"21\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"280.96\" cy=\"92.33\" r=\"3.47pt\" id=\"22\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"266.96\" cy=\"95.29\" r=\"3.47pt\" id=\"23\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"124.95\" cy=\"58.69\" r=\"3.47pt\" id=\"24\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"154.62\" cy=\"58.69\" r=\"3.47pt\" id=\"25\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"129.94\" cy=\"58.69\" r=\"3.47pt\" id=\"26\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"220.34\" cy=\"125.16\" r=\"3.47pt\" id=\"27\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"316.25\" cy=\"128.55\" r=\"3.47pt\" id=\"28\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"261.33\" cy=\"76.40\" r=\"3.47pt\" id=\"29\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"178.97\" cy=\"58.69\" r=\"3.47pt\" id=\"30\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"285.32\" cy=\"79.48\" r=\"3.47pt\" id=\"31\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"281.71\" cy=\"93.82\" r=\"3.47pt\" id=\"32\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"264.70\" cy=\"58.69\" r=\"3.47pt\" id=\"33\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"268.43\" cy=\"86.06\" r=\"3.47pt\" id=\"34\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"274.90\" cy=\"88.56\" r=\"3.47pt\" id=\"35\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"207.01\" cy=\"58.92\" r=\"3.47pt\" id=\"36\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"169.82\" cy=\"78.89\" r=\"3.47pt\" id=\"37\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"330.30\" cy=\"109.12\" r=\"3.47pt\" id=\"38\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"346.85\" cy=\"156.57\" r=\"3.47pt\" id=\"39\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"344.19\" cy=\"166.84\" r=\"3.47pt\" id=\"40\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"159.98\" cy=\"58.69\" r=\"3.47pt\" id=\"41\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"197.48\" cy=\"83.36\" r=\"3.47pt\" id=\"42\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"255.27\" cy=\"65.63\" r=\"3.47pt\" id=\"43\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"345.23\" cy=\"85.62\" r=\"3.47pt\" id=\"44\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"248.86\" cy=\"58.69\" r=\"3.47pt\" id=\"45\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"144.29\" cy=\"58.69\" r=\"3.47pt\" id=\"46\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"204.83\" cy=\"58.69\" r=\"3.47pt\" id=\"47\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"155.65\" cy=\"58.69\" r=\"3.47pt\" id=\"48\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"151.41\" cy=\"58.69\" r=\"3.47pt\" id=\"49\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"144.30\" cy=\"58.69\" r=\"3.47pt\" id=\"50\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"265.92\" cy=\"64.54\" r=\"3.47pt\" id=\"51\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"176.71\" cy=\"75.68\" r=\"3.47pt\" id=\"52\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"348.16\" cy=\"121.08\" r=\"3.47pt\" id=\"53\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"364.45\" cy=\"139.71\" r=\"3.47pt\" id=\"54\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"179.65\" cy=\"58.69\" r=\"3.47pt\" id=\"55\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"282.10\" cy=\"95.01\" r=\"3.47pt\" id=\"56\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"354.51\" cy=\"131.85\" r=\"3.47pt\" id=\"57\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"211.86\" cy=\"58.69\" r=\"3.47pt\" id=\"58\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"360.38\" cy=\"130.20\" r=\"3.47pt\" id=\"59\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"258.00\" cy=\"60.78\" r=\"3.47pt\" id=\"60\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"383.94\" cy=\"150.27\" r=\"3.47pt\" id=\"61\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"409.20\" cy=\"154.42\" r=\"3.47pt\" id=\"62\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"366.31\" cy=\"144.82\" r=\"3.47pt\" id=\"63\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"363.04\" cy=\"165.97\" r=\"3.47pt\" id=\"64\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"357.34\" cy=\"165.21\" r=\"3.47pt\" id=\"65\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"274.00\" cy=\"92.53\" r=\"3.47pt\" id=\"66\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"272.00\" cy=\"86.90\" r=\"3.47pt\" id=\"67\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"296.89\" cy=\"184.97\" r=\"3.47pt\" id=\"68\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"346.69\" cy=\"175.20\" r=\"3.47pt\" id=\"69\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"232.89\" cy=\"85.85\" r=\"3.47pt\" id=\"70\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"392.40\" cy=\"160.41\" r=\"3.47pt\" id=\"71\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"356.30\" cy=\"170.37\" r=\"3.47pt\" id=\"72\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"363.03\" cy=\"164.73\" r=\"3.47pt\" id=\"73\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"133.74\" cy=\"58.69\" r=\"3.47pt\" id=\"74\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"351.07\" cy=\"155.15\" r=\"3.47pt\" id=\"75\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"167.75\" cy=\"58.69\" r=\"3.47pt\" id=\"76\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"394.06\" cy=\"96.27\" r=\"3.47pt\" id=\"77\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"176.70\" cy=\"58.69\" r=\"3.47pt\" id=\"78\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"318.36\" cy=\"102.94\" r=\"3.47pt\" id=\"79\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"333.88\" cy=\"91.04\" r=\"3.47pt\" id=\"80\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"342.09\" cy=\"179.58\" r=\"3.47pt\" id=\"81\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"373.46\" cy=\"129.73\" r=\"3.47pt\" id=\"82\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"194.37\" cy=\"67.01\" r=\"3.47pt\" id=\"83\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"348.03\" cy=\"100.86\" r=\"3.47pt\" id=\"84\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"123.08\" cy=\"59.31\" r=\"3.47pt\" id=\"85\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"128.99\" cy=\"64.03\" r=\"3.47pt\" id=\"86\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"390.38\" cy=\"80.85\" r=\"3.47pt\" id=\"87\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"231.27\" cy=\"77.72\" r=\"3.47pt\" id=\"88\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"139.16\" cy=\"77.55\" r=\"3.47pt\" id=\"89\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"354.73\" cy=\"101.83\" r=\"3.47pt\" id=\"90\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"137.11\" cy=\"58.69\" r=\"3.47pt\" id=\"91\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"354.81\" cy=\"125.02\" r=\"3.47pt\" id=\"92\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"197.85\" cy=\"58.69\" r=\"3.47pt\" id=\"93\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"178.34\" cy=\"58.69\" r=\"3.47pt\" id=\"94\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"207.70\" cy=\"58.69\" r=\"3.47pt\" id=\"95\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"254.19\" cy=\"80.99\" r=\"3.47pt\" id=\"96\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"223.78\" cy=\"63.81\" r=\"3.47pt\" id=\"97\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"242.55\" cy=\"136.55\" r=\"3.47pt\" id=\"98\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"240.55\" cy=\"139.93\" r=\"3.47pt\" id=\"99\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"371.76\" cy=\"173.80\" r=\"3.47pt\" id=\"100\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"357.07\" cy=\"137.35\" r=\"3.47pt\" id=\"101\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"341.04\" cy=\"156.55\" r=\"3.47pt\" id=\"102\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"194.27\" cy=\"91.57\" r=\"3.47pt\" id=\"103\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"246.39\" cy=\"105.05\" r=\"3.47pt\" id=\"104\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"220.11\" cy=\"158.80\" r=\"3.47pt\" id=\"105\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"164.38\" cy=\"83.88\" r=\"3.47pt\" id=\"106\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"310.15\" cy=\"156.73\" r=\"3.47pt\" id=\"107\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"299.41\" cy=\"165.31\" r=\"3.47pt\" id=\"108\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"157.18\" cy=\"58.69\" r=\"3.47pt\" id=\"109\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"84.75\" cy=\"58.69\" r=\"3.47pt\" id=\"110\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"156.89\" cy=\"58.69\" r=\"3.47pt\" id=\"111\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"160.57\" cy=\"67.34\" r=\"3.47pt\" id=\"112\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"239.14\" cy=\"176.85\" r=\"3.47pt\" id=\"113\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"156.83\" cy=\"65.94\" r=\"3.47pt\" id=\"114\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"111.66\" cy=\"58.69\" r=\"3.47pt\" id=\"115\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"137.86\" cy=\"85.79\" r=\"3.47pt\" id=\"116\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"131.05\" cy=\"58.69\" r=\"3.47pt\" id=\"117\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"288.03\" cy=\"173.00\" r=\"3.47pt\" id=\"118\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"139.69\" cy=\"58.69\" r=\"3.47pt\" id=\"119\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"192.41\" cy=\"58.69\" r=\"3.47pt\" id=\"120\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"224.00\" cy=\"103.32\" r=\"3.47pt\" id=\"121\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"300.31\" cy=\"314.76\" r=\"3.47pt\" id=\"122\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"168.22\" cy=\"176.83\" r=\"3.47pt\" id=\"123\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"172.96\" cy=\"92.09\" r=\"3.47pt\" id=\"124\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"267.73\" cy=\"176.88\" r=\"3.47pt\" id=\"125\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"128.28\" cy=\"58.69\" r=\"3.47pt\" id=\"126\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"164.76\" cy=\"58.69\" r=\"3.47pt\" id=\"127\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"129.55\" cy=\"86.00\" r=\"3.47pt\" id=\"128\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"188.39\" cy=\"104.19\" r=\"3.47pt\" id=\"129\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"62.89\" cy=\"58.69\" r=\"3.47pt\" id=\"130\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"133.14\" cy=\"58.69\" r=\"3.47pt\" id=\"131\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"206.56\" cy=\"104.08\" r=\"3.47pt\" id=\"132\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"273.53\" cy=\"149.53\" r=\"3.47pt\" id=\"133\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"214.27\" cy=\"96.79\" r=\"3.47pt\" id=\"134\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <circle cx=\"290.59\" cy=\"152.96\" r=\"3.47pt\" id=\"135\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <polyline points=\"123.08,58.99 126.71,59.30 130.33,59.63 133.95,59.99 137.57,60.37 141.19,60.77 144.81,61.19 148.44,61.64 152.06,62.10 155.68,62.59 159.30,63.10 162.92,63.62 166.55,64.16 170.17,64.72 173.79,65.30 177.41,65.90 181.03,66.52 184.65,67.17 188.28,67.84 191.90,68.53 195.52,69.25 199.14,69.96 202.76,70.68 206.38,71.41 210.01,72.16 213.63,72.93 217.25,73.72 220.87,74.55 224.49,75.42 228.12,76.33 231.74,77.28 235.36,78.26 238.98,79.21 242.60,80.12 246.22,81.04 249.85,81.98 253.47,82.97 257.09,84.02 260.71,85.17 264.33,86.43 267.96,87.83 271.58,89.28 275.20,90.76 278.82,92.29 282.44,93.86 286.06,95.51 289.69,97.23 293.31,99.04 296.93,100.95 300.55,103.09 304.17,105.52 307.79,108.18 311.42,111.02 315.04,113.97 318.66,116.97 322.28,119.97 325.90,122.89 329.53,125.69 333.15,128.30 336.77,130.66 340.39,132.71 344.01,134.39 347.63,135.65 351.26,136.74 354.88,137.77 358.50,138.69 362.12,139.45 365.74,140.04 369.37,140.47 372.99,140.76 376.61,140.90 380.23,140.90 383.85,140.77 387.47,140.51 391.10,140.12 394.72,139.61 398.34,138.98 401.96,138.24 405.58,137.39 409.20,136.44\" id=\"136\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"2.13396\" stroke=\"#F8766D\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"62.89,59.29 66.02,58.81 69.15,58.41 72.28,58.09 75.41,57.84 78.54,57.66 81.67,57.56 84.80,57.54 87.93,57.59 91.06,57.71 94.19,57.91 97.32,58.18 100.45,58.53 103.58,58.95 106.71,59.44 109.84,60.00 112.97,60.64 116.10,61.39 119.23,62.23 122.36,63.15 125.49,64.13 128.62,65.15 131.75,66.26 134.88,67.53 138.01,68.87 141.14,70.19 144.26,71.60 147.39,73.09 150.52,74.64 153.65,76.23 156.78,77.84 159.91,79.43 163.04,80.95 166.17,82.37 169.30,83.80 172.43,85.37 175.56,87.11 178.69,88.92 181.82,90.78 184.95,92.71 188.08,94.70 191.21,96.74 194.34,98.85 197.47,101.01 200.60,103.23 203.73,105.51 206.86,107.84 209.99,110.22 213.12,112.63 216.25,115.08 219.38,117.58 222.51,120.11 225.64,122.70 228.77,125.33 231.90,128.01 235.03,130.74 238.16,133.53 241.29,136.37 244.42,139.28 247.55,142.25 250.68,145.26 253.81,148.32 256.94,151.41 260.07,154.52 263.20,157.65 266.33,160.79 269.46,163.93 272.59,167.06 275.72,170.18 278.85,173.27 281.98,176.34 285.11,179.36 288.24,182.34 291.37,185.29 294.50,188.24 297.63,191.19 300.76,194.14 303.89,197.10 307.02,200.06 310.15,203.02\" id=\"137\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_6)\" fill=\"none\" stroke-width=\"2.13396\" stroke=\"#00BFC4\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <rect x=\"45.57\" y=\"44.68\" width=\"380.95\" height=\"282.95\" id=\"138\" clip-path=\"url(#cl_id35f51f669ade20190604230157_6)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#333333\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <defs>\n      <clipPath id=\"cl_id35f51f669ade20190604230157_7\">\n        <rect x=\"0.00\" y=\"0.00\" width=\"432.00\" height=\"360.00\"/>\n      <\/clipPath>\n    <\/defs>\n    <g clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\">\n      <text x=\"28.41\" y=\"297.42\" id=\"139\" font-size=\"6.60pt\" fill=\"#4D4D4D\" fill-opacity=\"1\" font-family=\"Arial\">0.1<\/text>\n    <\/g>\n    <g clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\">\n      <text x=\"28.41\" y=\"218.89\" id=\"140\" font-size=\"6.60pt\" fill=\"#4D4D4D\" fill-opacity=\"1\" font-family=\"Arial\">1.0<\/text>\n    <\/g>\n    <g clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\">\n      <text x=\"23.51\" y=\"140.37\" id=\"141\" font-size=\"6.60pt\" fill=\"#4D4D4D\" fill-opacity=\"1\" font-family=\"Arial\">10.0<\/text>\n    <\/g>\n    <g clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\">\n      <text x=\"18.62\" y=\"61.84\" id=\"142\" font-size=\"6.60pt\" fill=\"#4D4D4D\" fill-opacity=\"1\" font-family=\"Arial\">100.0<\/text>\n    <\/g>\n    <polyline points=\"42.83,294.27 45.57,294.27\" id=\"143\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_7)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#333333\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"42.83,215.74 45.57,215.74\" id=\"144\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_7)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#333333\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"42.83,137.22 45.57,137.22\" id=\"145\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_7)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#333333\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"42.83,58.69 45.57,58.69\" id=\"146\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_7)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#333333\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"117.48,330.37 117.48,327.63\" id=\"147\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_7)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#333333\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"217.34,330.37 217.34,327.63\" id=\"148\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_7)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#333333\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"317.19,330.37 317.19,327.63\" id=\"149\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_7)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#333333\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <polyline points=\"417.05,330.37 417.05,327.63\" id=\"150\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_7)\" fill=\"none\" stroke-width=\"1.06698\" stroke=\"#333333\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\"/>\n    <g clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\">\n      <text x=\"115.03\" y=\"338.86\" id=\"151\" font-size=\"6.60pt\" fill=\"#4D4D4D\" fill-opacity=\"1\" font-family=\"Arial\">0<\/text>\n    <\/g>\n    <g clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\">\n      <text x=\"212.44\" y=\"338.86\" id=\"152\" font-size=\"6.60pt\" fill=\"#4D4D4D\" fill-opacity=\"1\" font-family=\"Arial\">50<\/text>\n    <\/g>\n    <g clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\">\n      <text x=\"309.85\" y=\"338.86\" id=\"153\" font-size=\"6.60pt\" fill=\"#4D4D4D\" fill-opacity=\"1\" font-family=\"Arial\">100<\/text>\n    <\/g>\n    <g clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\">\n      <text x=\"409.71\" y=\"338.86\" id=\"154\" font-size=\"6.60pt\" fill=\"#4D4D4D\" fill-opacity=\"1\" font-family=\"Arial\">150<\/text>\n    <\/g>\n    <g clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\">\n      <text x=\"205.16\" y=\"352.00\" id=\"155\" font-size=\"8.25pt\" font-family=\"Arial\">Single_Point<\/text>\n    <\/g>\n    <g clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\">\n      <text transform=\"translate(13.35,226.82) rotate(-90)\" id=\"156\" font-size=\"8.25pt\" font-family=\"Arial\">Dose_Response<\/text>\n    <\/g>\n    <rect x=\"180.56\" y=\"5.48\" width=\"110.97\" height=\"28.24\" id=\"157\" clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\" fill=\"none\" stroke=\"none\"/>\n    <g clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\">\n      <text x=\"186.04\" y=\"23.54\" id=\"158\" font-size=\"8.25pt\" font-family=\"Arial\">Target<\/text>\n    <\/g>\n    <rect x=\"223.31\" y=\"10.96\" width=\"17.28\" height=\"17.28\" id=\"159\" clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\" fill=\"none\" stroke=\"none\"/>\n    <circle cx=\"231.95\" cy=\"19.60\" r=\"3.47pt\" id=\"160\" clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\" fill=\"#F8766D\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#F8766D\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <line x1=\"225.04\" y1=\"19.60\" x2=\"238.86\" y2=\"19.60\" id=\"161\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_7)\" stroke-width=\"2.13396\" stroke=\"#F8766D\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\" fill=\"#FFFFFF\" fill-opacity=\"1\"/>\n    <rect x=\"257.42\" y=\"10.96\" width=\"17.28\" height=\"17.28\" id=\"162\" clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\" fill=\"none\" stroke=\"none\"/>\n    <circle cx=\"266.06\" cy=\"19.60\" r=\"3.47pt\" id=\"163\" clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\" fill=\"#00BFC4\" fill-opacity=\"0.4\" stroke-width=\"0.708661\" stroke=\"#00BFC4\" stroke-opacity=\"0.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n    <line x1=\"259.15\" y1=\"19.60\" x2=\"272.97\" y2=\"19.60\" id=\"164\" clip-path=\"url(#cl_svg_35f543c1783020190604230157_7)\" stroke-width=\"2.13396\" stroke=\"#00BFC4\" stroke-opacity=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"butt\" fill=\"#FFFFFF\" fill-opacity=\"1\"/>\n    <g clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\">\n      <text x=\"246.07\" y=\"22.75\" id=\"165\" font-size=\"6.60pt\" font-family=\"Arial\">A<\/text>\n    <\/g>\n    <g clip-path=\"url(#cl_id35f51f669ade20190604230157_7)\">\n      <text x=\"280.18\" y=\"22.75\" id=\"166\" font-size=\"6.60pt\" font-family=\"Arial\">B<\/text>\n    <\/g>\n  <\/g>\n<\/svg>\n","js":"function zzz(){document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('19').setAttribute('title','Mol-2082');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('20').setAttribute('title','Mol-1343');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('21').setAttribute('title','Mol-724');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('22').setAttribute('title','Mol-6779');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('23').setAttribute('title','Mol-9532');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('24').setAttribute('title','Mol-3338');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('25').setAttribute('title','Mol-7411');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('26').setAttribute('title','Mol-8612');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('27').setAttribute('title','Mol-9680');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('28').setAttribute('title','Mol-317');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('29').setAttribute('title','Mol-9300');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('30').setAttribute('title','Mol-5283');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('31').setAttribute('title','Mol-9052');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('32').setAttribute('title','Mol-1139');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('33').setAttribute('title','Mol-4822');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('34').setAttribute('title','Mol-9643');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('35').setAttribute('title','Mol-1271');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('36').setAttribute('title','Mol-2324');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('37').setAttribute('title','Mol-3242');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('38').setAttribute('title','Mol-7099');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('39').setAttribute('title','Mol-9343');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('40').setAttribute('title','Mol-2712');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('41').setAttribute('title','Mol-2821');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('42').setAttribute('title','Mol-8153');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('43').setAttribute('title','Mol-2103');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('44').setAttribute('title','Mol-799');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('45').setAttribute('title','Mol-4429');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('46').setAttribute('title','Mol-4488');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('47').setAttribute('title','Mol-3078');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('48').setAttribute('title','Mol-5911');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('49').setAttribute('title','Mol-5806');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('50').setAttribute('title','Mol-6931');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('51').setAttribute('title','Mol-223');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('52').setAttribute('title','Mol-8005');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('53').setAttribute('title','Mol-6137');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('54').setAttribute('title','Mol-6046');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('55').setAttribute('title','Mol-415');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('56').setAttribute('title','Mol-6352');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('57').setAttribute('title','Mol-4602');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('58').setAttribute('title','Mol-3749');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('59').setAttribute('title','Mol-5050');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('60').setAttribute('title','Mol-6673');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('61').setAttribute('title','Mol-8936');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('62').setAttribute('title','Mol-7179');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('63').setAttribute('title','Mol-3061');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('64').setAttribute('title','Mol-9478');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('65').setAttribute('title','Mol-2413');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('66').setAttribute('title','Mol-170');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('67').setAttribute('title','Mol-5774');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('68').setAttribute('title','Mol-7986');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('69').setAttribute('title','Mol-2118');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('70').setAttribute('title','Mol-5992');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('71').setAttribute('title','Mol-3917');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('72').setAttribute('title','Mol-8867');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('73').setAttribute('title','Mol-4082');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('74').setAttribute('title','Mol-6829');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('75').setAttribute('title','Mol-418');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('76').setAttribute('title','Mol-6251');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('77').setAttribute('title','Mol-8127');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('78').setAttribute('title','Mol-2027');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('79').setAttribute('title','Mol-5021');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('80').setAttribute('title','Mol-9934');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('81').setAttribute('title','Mol-4512');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('82').setAttribute('title','Mol-2311');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('83').setAttribute('title','Mol-8828');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('84').setAttribute('title','Mol-8991');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('85').setAttribute('title','Mol-5959');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('86').setAttribute('title','Mol-9475');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('87').setAttribute('title','Mol-432');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('88').setAttribute('title','Mol-2417');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('89').setAttribute('title','Mol-9880');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('90').setAttribute('title','Mol-8935');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('91').setAttribute('title','Mol-5112');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('92').setAttribute('title','Mol-7637');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('93').setAttribute('title','Mol-914');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('94').setAttribute('title','Mol-2991');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('95').setAttribute('title','Mol-2995');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('96').setAttribute('title','Mol-1654');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('97').setAttribute('title','Mol-5832');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('98').setAttribute('title','Mol-1791');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('99').setAttribute('title','Mol-8974');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('100').setAttribute('title','Mol-4156');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('101').setAttribute('title','Mol-9332');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('102').setAttribute('title','Mol-1158');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('103').setAttribute('title','Mol-3952');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('104').setAttribute('title','Mol-3066');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('105').setAttribute('title','Mol-1012');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('106').setAttribute('title','Mol-6202');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('107').setAttribute('title','Mol-4664');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('108').setAttribute('title','Mol-3938');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('109').setAttribute('title','Mol-1461');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('110').setAttribute('title','Mol-7735');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('111').setAttribute('title','Mol-3896');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('112').setAttribute('title','Mol-2688');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('113').setAttribute('title','Mol-5876');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('114').setAttribute('title','Mol-1072');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('115').setAttribute('title','Mol-5923');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('116').setAttribute('title','Mol-7553');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('117').setAttribute('title','Mol-4094');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('118').setAttribute('title','Mol-8731');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('119').setAttribute('title','Mol-3913');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('120').setAttribute('title','Mol-5491');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('121').setAttribute('title','Mol-4213');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('122').setAttribute('title','Mol-3180');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('123').setAttribute('title','Mol-2399');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('124').setAttribute('title','Mol-9998');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('125').setAttribute('title','Mol-3048');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('126').setAttribute('title','Mol-6659');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('127').setAttribute('title','Mol-5813');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('128').setAttribute('title','Mol-318');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('129').setAttribute('title','Mol-5625');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('130').setAttribute('title','Mol-3872');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('131').setAttribute('title','Mol-3340');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('132').setAttribute('title','Mol-5550');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('133').setAttribute('title','Mol-976');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('134').setAttribute('title','Mol-4738');document.querySelectorAll('#svg_35f543c1783020190604230157')[0].getElementById('135').setAttribute('title','Mol-6189');};","uid":"svg_35f543c1783020190604230157","ratio":1.2,"settings":{"tooltip":{"css":"{position:absolute;pointer-events:none;z-index:999;padding:5px;background:black;color:white;border-radius:2px 2px 2px 2px;}","offx":10,"offy":0,"use_cursor_pos":true,"opacity":0.9,"usefill":false,"usestroke":false,"delay":{"over":200,"out":500}},"hover":{"css":"{fill:orange;stroke:gray;}"},"zoom":{"min":1,"max":1},"capture":{"css":"{fill:red;stroke:gray;}","type":"multiple","only_shiny":true},"toolbar":{"position":"top","saveaspng":false},"sizing":{"rescale":true,"width":1}}},"evals":[],"jsHooks":[]}</script>
+]
+
+---
+
+# Access ggiraph events in shiny
+
+```r
+library(shiny)
+library(ggiraph)
+ggiraph_ggplot &lt;- 
+  ggplot(assays, aes(x = Single_Point, y = Dose_Response, color = Target)) +
+  geom_point_interactive(aes(tooltip = Compound, data_id = Compound), size = 4, alpha = .4) +
+  geom_smooth(se = FALSE) + scale_y_log10()
+  
+ui &lt;- fluidPage(
+  girafeOutput("plot"),
+  tableOutput("table")
+)
+
+server &lt;- function(input, output, session) {
+  output$plot &lt;- renderGirafe({
+    ggiraph(
+      ggobj = ggiraph_ggplot, 
+      hover_css = "fill:red;cursor:pointer;",
+      selection_type = "single",
+      selected_css = "fill:red;"
+    )
+  })
+  output$table &lt;- renderTable(filter(assays, Compound %in% input$plot_selected))
+}
+shinyApp(ui, server)
+```
+
+
+---
+
+# Where to Find More
+
+* More about **shiny**'s "static" interactivity &lt;https://shiny.rstudio.com/articles/#graphics&gt;
+* More about **plotly** &lt;https://plotly-r.com/&gt;
+* More about **ggiraph** &lt;http://davidgohel.github.io/ggiraph/&gt;
+* More about **htmlwidgets** &lt;http://www.htmlwidgets.org/&gt;
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "16:9",
+"highlightLanguage": "R",
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
