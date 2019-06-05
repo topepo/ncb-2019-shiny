@@ -244,7 +244,9 @@ plotly_example("shiny", "event_data")
 plotly_example("shiny", "event_data_3D")
 ```
 
-How many different plotly events are these apps showing? Can you trigger all of them?
+1. How many different plotly events are these apps showing? Can you trigger all of them?
+
+2. Modify the shiny app in the last slide to respond to click events instead of hover. Modify it again to respond to brush events.
 
 
 ---
