@@ -48,8 +48,9 @@ server <-
     
     output$histogram <- renderPlot({
       dat <- get_data()
+      req(input$value_col)
       out <- ggplot(dat, aes_string(x = input$value_col)) +
-        geom_histogram(alpha = .7, fill = "red", col = "red") + 
+        geom_histogram(alpha = .7, fill = "red", col = "white") + 
         theme_bw()
       if (input$log_scale) {
         out <- out + scale_x_log10()
