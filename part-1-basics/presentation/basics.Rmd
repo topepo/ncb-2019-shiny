@@ -12,10 +12,9 @@ output:
       countIncrementalSlides: false   
 ---
 
+# What Is `shiny`?
 
-## What Is `shiny`?
-
-`shiny` is [a web application framework for R](shiny.rstudio.com)
+`shiny` is [a web application framework for R](https://shiny.rstudio.com)
 
 You can create a web application where you define the user interface (UI) look and feel and create R code to work behind the scenes to generate output
 
@@ -48,7 +47,7 @@ Here are some instances that meld statistics and visualizations:
 
 # Advantages 
 
- * `shiny` is free ("as in beer" and "as is speech"")`*`
+ * `shiny` is free ("as in beer" and "as is speech"")<sup>`*`</sup>
  * you can install it anywhere without worrying about licenses
  * it is well-supported (officially and unofficially) and well-developed
  * it integrates with modern web features (e.g. HTML, Javascript, Google Widgets, css, JSON, markdown, etc)
@@ -57,9 +56,9 @@ Here are some instances that meld statistics and visualizations:
  * it knows how to handle types of R objects (e.g. plots vs tables vs text etc.)
  * great integration with RStudio 
  * rich user-interface capabilities 
- * dozens of `shiny` related packages on CRAN and Bioconductor, thousands of [related github repositories](http://bit.ly/1PyOUwg)
+ * dozens of `shiny` related packages on CRAN and Bioconductor, > 13K [related github repositories](http://bit.ly/1PyOUwg)
  
-`*` _Some_ deployment options (RStudio Connect, ShinyApps.io) ar enot free
+<sup>`*`</sup> _Some_ deployment options ([RStudio Connect](https://www.rstudio.com/products/connect/), [ShinyApps.io](https://www.shinyapps.io/)) are not free
 
 ---
 
@@ -483,6 +482,7 @@ and the server contains:
 ```{r server_hist, eval=FALSE}
 renderPlot({
   dat <- get_data()
+  req(input$value_col)
   out <- ggplot(dat, aes_string(x = input$value_col)) +
     geom_histogram(alpha = .7, fill = "red", col = "red") + 
     theme_bw()
