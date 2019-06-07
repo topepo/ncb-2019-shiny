@@ -109,7 +109,7 @@ What about that point with a low `Dose_Response`? What compound is it?
 
 
 .pull-right[
-```{r, echo = FALSE}
+```{r, echo = FALSE, dev = 'svg', dev.args = list(bg = "transparent")}
 p <- ggplot(data = assays, aes(x = Single_Point, y = Dose_Response, color = Target)) +
   geom_point(size = 4, alpha = .4) +
   geom_smooth(se = FALSE) +  
@@ -186,7 +186,19 @@ ggplotly(p)
 ]
 
 .pull-right[
-<iframe src="ggplotly.html" width="100%" height=500 scrolling="no" seamless="seamless" frameBorder="0">
+
+```{r, plotly-1, echo = FALSE, out.width="80%"}
+library(plotly)
+
+p <- ggplot(data = assays) +
+  aes(x = Single_Point, y = Dose_Response, color = Target) +
+  geom_point(size = 4, alpha = .4) +
+  geom_smooth(se = FALSE) +  
+  scale_y_log10()
+  
+ggplotly(p, width = 480, height = 384)
+```
+
 ]
 
   
@@ -200,8 +212,6 @@ It's easiest to get started with **plotly**'s `ggplotly()`. This function conver
 .code70[
 
 ```r
-library(plotly)
-
 p <- ggplot(data = assays) +
   aes(x = Single_Point, y = Dose_Response, color = Target) +
   geom_point(aes(text = Compound), size = 4, alpha = .4) +
@@ -219,7 +229,17 @@ To control the tooltip that appears, use the `text` aesthetic (notice how `Compo
 ]
 
 .pull-right[
-<iframe src="ggplotly-text.html" width="100%" height=500 scrolling="no" seamless="seamless" frameBorder="0">
+
+```{r, plotly-2, echo = FALSE, out.width="80%"}
+p2 <- ggplot(data = assays) +
+  aes(x = Single_Point, y = Dose_Response, color = Target) +
+  geom_point(aes(text = Compound), size = 4, alpha = .4) +
+  geom_smooth(se = FALSE) +  
+  scale_y_log10()
+  
+ggplotly(p2, width = 480, height = 384, tooltip = "text")
+```
+
 ]
 
 
@@ -240,14 +260,28 @@ plot_ly(
   size = I(50),
   alpha = 0.4
 ) %>%
-  layout(yaxis = list(type = "log"))
+  layout(yaxis = list(type = "log"), width = 480, height = 384)
 ```
 
 **plotly** also provides the building block for other useful packages like [**heatmaply**](https://cran.r-project.org/web/packages/heatmaply/vignettes/heatmaply.html) and [**TSStudio**](https://cran.r-project.org/web/packages/TSstudio/index.html)
 ]
 
 .pull-right[
-<iframe src="plotly.html" width="100%" height=500 scrolling="no" seamless="seamless" frameBorder="0">
+
+```{r, plotly-3, echo = FALSE, out.width="80%"}
+plot_ly(
+  assays,
+  x = ~ Single_Point,
+  y = ~ Dose_Response,
+  color = ~ Target,
+  text = ~ Compound,
+  size = I(50),
+  alpha = 0.4
+) %>%
+  layout(yaxis = list(type = "log"))
+```
+
+
 ]
 
 
