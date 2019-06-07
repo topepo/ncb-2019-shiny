@@ -1,6 +1,6 @@
 Materials for the _R shiny tutorial with nonclinical applications_ at the 2019 Nonclinical Biostatistics conference
 
-Materials can be found at [`https://github.com/topepo/ncb-2019-shiny`](https://github.com/topepo/ncb-2019-shiny). If you've never used GitHub, just choose the green _Clone or download" button on the right-hand side and download the ZIP file. 
+Materials can be found at [`https://github.com/topepo/ncb-2019-shiny`](https://github.com/topepo/ncb-2019-shiny). If you've never used GitHub, just choose the green _"Clone or download"_ button on the right-hand side and download the ZIP file. 
 
 The main notes require a few R packages. You can install them using:
 
